@@ -1,0 +1,12 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+appsettings.json
+appsettings.Development.json
+Properties/launchSettings.json
+__azurite_db_*
+__blobstorage__/
+AzuriteConfig
