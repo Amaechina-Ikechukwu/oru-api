@@ -17,6 +17,13 @@ using ORUApi.Endpoints.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Sentry
+builder.WebHost.UseSentry(o =>
+{
+    o.Dsn = "https://45dd6086626ff49497bba810f816daa1@o4507437373980672.ingest.de.sentry.io/4511564752945232";
+    o.Debug = true;
+});
+
 // Key Vault — only in production when a vault name is configured
 var kvName = builder.Configuration["KeyVault:Name"];
 if (!string.IsNullOrEmpty(kvName))
