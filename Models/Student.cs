@@ -27,7 +27,7 @@ public class Student
     public List<PaymentInstallment> PaymentHistory { get; set; } = [];
     public List<InstallmentSubmission> InstallmentSubmissions { get; set; } = [];
 
-    public AccountStatus Status { get; set; } = AccountStatus.Active;
+    public AccountStatus Status { get; set; } = AccountStatus.Pending;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -49,7 +49,7 @@ public class PaymentInstallment
     public DateTime PaidAt { get; set; }
 }
 
-public enum AccountStatus { Active, Suspended, Graduated }
+public enum AccountStatus { Pending = 3, Active = 0, Suspended = 1, Graduated = 2 }
 
 public class InstallmentSubmission
 {

@@ -65,6 +65,7 @@ builder.Services.AddAuthorization(opt => {
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<BlobStorageService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddSingleton<EmailService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using ORUApi.Data;
 using ORUApi.Models;
 using ORUApi.Services;
 
@@ -23,7 +25,8 @@ public static class WebhookEndpoints
     }
 
     static async Task<IResult> HandlePaystack(
-        HttpRequest request, PaymentService payments, ILogger logger)
+        HttpRequest request, PaymentService payments, EmailService email,
+        ORUDbContext db, ILogger logger)
     {
         var body = await new StreamReader(request.Body).ReadToEndAsync();
         var signature = request.Headers["x-paystack-signature"].ToString();
@@ -40,16 +43,25 @@ public static class WebhookEndpoints
         if (payload?.Event != "charge.success")
             return Results.Ok(ApiResponse.Ok<object?>(null, "Webhook received — non-success event ignored."));
 
-        await payments.RecordPaymentAsync(
+        var recorded = await payments.RecordPaymentAsync(
             payload.Data.Customer.Email, payload.Data.Amount,
             payload.Data.Reference, "paystack");
+
+        if (recorded)
+        {
+            var student = await db.Students.FirstOrDefaultAsync(s => s.Email == payload.Data.Customer.Email);
+            if (student is not null)
+                email.SendFireAndForget(student.Email, student.FullName,
+                    "Payment Received — ORU",
+                    EmailService.PaymentReceived(student.FullName, payload.Data.Amount / 100m, payload.Data.Reference));
+        }
 
         return Results.Ok(ApiResponse.Ok<object?>(null, "Payment recorded successfully."));
     }
 
     static async Task<IResult> HandleMonnify(
-        HttpRequest request, PaymentService payments,
-        IConfiguration config, ILogger logger)
+        HttpRequest request, PaymentService payments, EmailService email,
+        IConfiguration config, ORUDbContext db, ILogger logger)
     {
         var body = await new StreamReader(request.Body).ReadToEndAsync();
         var signature = request.Headers["monnify-signature"].ToString();
@@ -71,17 +83,26 @@ public static class WebhookEndpoints
         if (payload?.EventType != "SUCCESSFUL_TRANSACTION")
             return Results.Ok(ApiResponse.Ok<object?>(null, "Webhook received — non-success event ignored."));
 
-        await payments.RecordPaymentAsync(
+        var recorded = await payments.RecordPaymentAsync(
             payload.EventData.Customer.Email,
             payload.EventData.AmountPaid * 100,
             payload.EventData.PaymentReference, "monnify");
+
+        if (recorded)
+        {
+            var student = await db.Students.FirstOrDefaultAsync(s => s.Email == payload.EventData.Customer.Email);
+            if (student is not null)
+                email.SendFireAndForget(student.Email, student.FullName,
+                    "Payment Received — ORU",
+                    EmailService.PaymentReceived(student.FullName, payload.EventData.AmountPaid, payload.EventData.PaymentReference));
+        }
 
         return Results.Ok(ApiResponse.Ok<object?>(null, "Payment recorded successfully."));
     }
 
     static async Task<IResult> HandleFlutterwave(
-        HttpRequest request, PaymentService payments,
-        IConfiguration config, ILogger logger)
+        HttpRequest request, PaymentService payments, EmailService email,
+        IConfiguration config, ORUDbContext db, ILogger logger)
     {
         var verifyHash = request.Headers["verif-hash"].ToString();
         if (verifyHash != config["Flutterwave:SecretHash"]!)
@@ -97,10 +118,19 @@ public static class WebhookEndpoints
         if (payload?.Event != "charge.completed" || payload.Data.Status != "successful")
             return Results.Ok(ApiResponse.Ok<object?>(null, "Webhook received — non-success event ignored."));
 
-        await payments.RecordPaymentAsync(
+        var recorded = await payments.RecordPaymentAsync(
             payload.Data.Customer.Email,
             payload.Data.Amount * 100,
             payload.Data.TxRef, "flutterwave");
+
+        if (recorded)
+        {
+            var student = await db.Students.FirstOrDefaultAsync(s => s.Email == payload.Data.Customer.Email);
+            if (student is not null)
+                email.SendFireAndForget(student.Email, student.FullName,
+                    "Payment Received — ORU",
+                    EmailService.PaymentReceived(student.FullName, payload.Data.Amount, payload.Data.TxRef));
+        }
 
         return Results.Ok(ApiResponse.Ok<object?>(null, "Payment recorded successfully."));
     }

@@ -171,12 +171,22 @@ public static class StudentEndpoints
     }
 
     static async Task<IResult> UpdateStatus(
-        Guid id, UpdateAccountStatusRequest req, ORUDbContext db)
+        Guid id, UpdateAccountStatusRequest req, ORUDbContext db, EmailService email)
     {
         var student = await db.Students.FindAsync(id);
         if (student is null) return Results.NotFound(ApiResponse.Error("Student not found."));
         student.Status = req.Status;
         await db.SaveChangesAsync();
+
+        if (req.Status == AccountStatus.Suspended)
+            email.SendFireAndForget(student.Email, student.FullName,
+                "Account Suspended — ORU",
+                EmailService.StudentSuspended(student.FullName, student.MatricNumber));
+        else if (req.Status == AccountStatus.Active)
+            email.SendFireAndForget(student.Email, student.FullName,
+                "Account Reactivated — ORU",
+                EmailService.StudentReactivated(student.FullName, student.MatricNumber));
+
         return Results.Ok(ApiResponse.Ok(new { student.MatricNumber, student.Status }, "Student status updated successfully."));
     }
 
@@ -296,7 +306,8 @@ public static class StudentEndpoints
         Guid submissionId,
         ReviewInstallmentRequest req,
         ClaimsPrincipal user,
-        ORUDbContext db)
+        ORUDbContext db,
+        EmailService email)
     {
         var student = await db.Students.FindAsync(studentId);
         if (student is null) return Results.NotFound(ApiResponse.Error("Student not found."));
@@ -326,6 +337,15 @@ public static class StudentEndpoints
                 Gateway = "installment",
                 PaidAt = DateTime.UtcNow
             });
+            email.SendFireAndForget(student.Email, student.FullName,
+                "Installment Approved — ORU",
+                EmailService.InstallmentApproved(student.FullName, submission.InstallmentNumber, submission.Amount));
+        }
+        else
+        {
+            email.SendFireAndForget(student.Email, student.FullName,
+                "Installment Rejected — ORU",
+                EmailService.InstallmentRejected(student.FullName, submission.InstallmentNumber, submission.Amount));
         }
 
         await db.SaveChangesAsync();

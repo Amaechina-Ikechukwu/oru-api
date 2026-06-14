@@ -44,7 +44,7 @@ public static class ApplicationEndpoints
     }
 
     static async Task<IResult> SubmitApplication(
-        SubmitApplicationRequest req, ORUDbContext db)
+        SubmitApplicationRequest req, ORUDbContext db, EmailService email)
     {
         if (string.IsNullOrWhiteSpace(req.FullName))
             return Results.BadRequest(ApiResponse.Error("Full name is required."));
@@ -77,6 +77,11 @@ public static class ApplicationEndpoints
         await db.SaveChangesAsync();
 
         application.StudyLevelRef = level;
+
+        email.SendFireAndForget(req.Email, req.FullName,
+            "Application Received — ORU",
+            EmailService.ApplicationSubmitted(req.FullName, req.SelectedProgram));
+
         return Results.Created(
             $"/api/applications/{application.Id}",
             ApiResponse.Ok(ApplicationMapper.ToResponse(application), "Application submitted successfully."));
@@ -151,7 +156,7 @@ public static class ApplicationEndpoints
     }
 
     static async Task<IResult> UpdateStatus(
-        Guid id, UpdateStatusRequest req, ORUDbContext db)
+        Guid id, UpdateStatusRequest req, ORUDbContext db, EmailService email)
     {
         var application = await db.Applications
             .Include(a => a.StudyLevelRef)
@@ -160,10 +165,20 @@ public static class ApplicationEndpoints
         if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
         application.Status = req.Status;
         await db.SaveChangesAsync();
+
+        if (req.Status == ApplicationStatus.Approved)
+            email.SendFireAndForget(application.Email, application.FullName,
+                "Application Approved — ORU",
+                EmailService.ApplicationApproved(application.FullName, application.SelectedProgram));
+        else if (req.Status == ApplicationStatus.Rejected)
+            email.SendFireAndForget(application.Email, application.FullName,
+                "Application Update — ORU",
+                EmailService.ApplicationRejected(application.FullName, application.SelectedProgram));
+
         return Results.Ok(ApiResponse.Ok(ApplicationMapper.ToResponse(application), "Application status updated successfully."));
     }
 
-    static async Task<IResult> AdmitStudent(Guid id, ORUDbContext db)
+    static async Task<IResult> AdmitStudent(Guid id, ORUDbContext db, EmailService email)
     {
         var application = await db.Applications.FindAsync(id);
         if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
@@ -187,6 +202,10 @@ public static class ApplicationEndpoints
 
         db.Students.Add(student);
         await db.SaveChangesAsync();
+
+        email.SendFireAndForget(application.Email, application.FullName,
+            "Welcome to ORU!",
+            EmailService.StudentAdmitted(application.FullName, matric));
 
         return Results.Ok(ApiResponse.Ok(new
         {

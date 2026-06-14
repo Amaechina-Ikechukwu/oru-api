@@ -16,6 +16,10 @@ public static class AuthEndpoints
             .AllowAnonymous()
             .WithSummary("Student login");
 
+        group.MapPost("/student/activate", ActivateStudent)
+            .AllowAnonymous()
+            .WithSummary("Activate student account (first-time setup)");
+
         group.MapPost("/admin/login", AdminLogin)
             .AllowAnonymous()
             .WithSummary("Admin/staff login");
@@ -49,13 +53,46 @@ public static class AuthEndpoints
         if (student is null || !BCrypt.Net.BCrypt.Verify(req.Password, student.PasswordHash))
             return Results.Unauthorized();
 
-        if (student.Status == AccountStatus.Suspended)
+        if (student.Status == AccountStatus.Suspended || student.Status == AccountStatus.Pending)
             return Results.Forbid();
 
         var token = tokens.CreateStudentToken(student);
         return Results.Ok(ApiResponse.Ok(
             new AuthResponse(token, "Student", student.FullName, student.Id.ToString()),
             "Login successful."));
+    }
+
+    static async Task<IResult> ActivateStudent(
+        ActivateStudentRequest req, ORUDbContext db)
+    {
+        if (string.IsNullOrWhiteSpace(req.Email))
+            return Results.BadRequest(ApiResponse.Error("Email is required."));
+
+        if (string.IsNullOrWhiteSpace(req.MatricNumber))
+            return Results.BadRequest(ApiResponse.Error("Matric number is required."));
+
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 6)
+            return Results.BadRequest(ApiResponse.Error("Password must be at least 6 characters."));
+
+        var student = await db.Students.FirstOrDefaultAsync(s =>
+            s.Email == req.Email && s.MatricNumber == req.MatricNumber);
+
+        if (student is null)
+            return Results.NotFound(ApiResponse.Error("No matching student record found."));
+
+        if (student.Status != AccountStatus.Pending)
+            return Results.BadRequest(ApiResponse.Error("Account is already activated."));
+
+        student.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        student.Status = AccountStatus.Active;
+        await db.SaveChangesAsync();
+
+        return Results.Ok(ApiResponse.Ok(new
+        {
+            student.MatricNumber,
+            student.FullName,
+            student.Email
+        }, "Account activated successfully. You may now log in."));
     }
 
     static async Task<IResult> AdminLogin(
@@ -88,7 +125,7 @@ public static class AuthEndpoints
         return Results.Ok(ApiResponse.Ok<object?>(null, "Password updated successfully."));
     }
 
-    static async Task<IResult> CreateAdmin(CreateAdminRequest req, ORUDbContext db)
+    static async Task<IResult> CreateAdmin(CreateAdminRequest req, ORUDbContext db, EmailService email)
     {
         if (await db.Admins.AnyAsync(a => a.Email == req.Email))
             return Results.Conflict(ApiResponse.Error("An admin with this email already exists."));
@@ -108,6 +145,10 @@ public static class AuthEndpoints
 
         db.Admins.Add(admin);
         await db.SaveChangesAsync();
+
+        email.SendFireAndForget(req.Email, req.FullName,
+            "Admin Account Created — ORU",
+            EmailService.AdminCreated(req.FullName, req.StaffId, req.Email, req.Role.ToString(), req.Password));
 
         return Results.Created($"/api/admin/admins/{admin.Id}",
             ApiResponse.Ok(new
