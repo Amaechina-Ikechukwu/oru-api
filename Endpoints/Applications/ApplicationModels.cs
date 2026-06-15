@@ -14,6 +14,16 @@ public record SubmitApplicationRequest(
 
 public record UpdateStatusRequest(ApplicationStatus Status);
 
+public record DocumentResponse(
+    Guid Id,
+    string Name,
+    string FileUrl,
+    string FileName,
+    string ContentType,
+    long FileSize,
+    DateTime UploadedAt
+);
+
 public record ApplicationResponse(
     Guid Id,
     string FullName,
@@ -23,7 +33,7 @@ public record ApplicationResponse(
     string? StudyLevelName,
     ApplicationStatus Status,
     bool ApplicationFeePaid,
-    List<string> DocumentUrls,
+    List<DocumentResponse> Documents,
     DateTime SubmittedAt
 );
 
@@ -35,6 +45,15 @@ public static class ApplicationMapper
         a.StudyLevelId,
         a.StudyLevelRef?.Name,
         a.Status, a.ApplicationFeePaid,
-        a.DocumentUrls, a.SubmittedAt
+        a.Documents.Select(DocumentMapper.ToResponse).ToList(),
+        a.SubmittedAt
+    );
+}
+
+public static class DocumentMapper
+{
+    public static DocumentResponse ToResponse(ApplicationDocument d) => new(
+        d.Id, d.Name, d.FileUrl, d.FileName,
+        d.ContentType, d.FileSize, d.UploadedAt
     );
 }

@@ -25,7 +25,7 @@ namespace ORUApi.Models
         public bool ApplicationFeePaid { get; set; } = false;
         public string? PaymentReference { get; set; }
 
-        public List<string> DocumentUrls { get; set; } = [];
+        public List<ApplicationDocument> Documents { get; set; } = [];
 
         public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
     }

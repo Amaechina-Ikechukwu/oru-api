@@ -24,6 +24,13 @@ public static class ApplicationEndpoints
             .WithSummary("Upload supporting documents")
             .DisableAntiforgery();
 
+        group.MapPut("/{id}/documents/{documentId:guid}", ReplaceDocument)
+            .WithSummary("Replace a previously uploaded document")
+            .DisableAntiforgery();
+
+        group.MapDelete("/{id}/documents/{documentId:guid}", DeleteDocument)
+            .WithSummary("Delete a document");
+
         var admin = app.MapGroup("/api/admin/applications").WithTags("Admin: Applications");
 
         admin.MapGet("/", GetAllApplications)
@@ -142,6 +149,7 @@ public static class ApplicationEndpoints
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Include(a => a.StudyLevelRef)
+            .Include(a => a.Documents)
             .Select(a => ApplicationMapper.ToResponse(a))
             .ToListAsync();
 
@@ -152,6 +160,7 @@ public static class ApplicationEndpoints
     {
         var application = await db.Applications
             .Include(a => a.StudyLevelRef)
+            .Include(a => a.Documents)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
@@ -163,6 +172,7 @@ public static class ApplicationEndpoints
     {
         var application = await db.Applications
             .Include(a => a.StudyLevelRef)
+            .Include(a => a.Documents)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
@@ -219,30 +229,111 @@ public static class ApplicationEndpoints
     }
 
     static async Task<IResult> UploadDocuments(
-        Guid id, IFormFileCollection files,
+        Guid id, IFormFileCollection files, string name,
         ORUDbContext db, BlobStorageService blob)
     {
         var application = await db.Applications.FindAsync(id);
         if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
         if (files.Count == 0) return Results.BadRequest(ApiResponse.Error("No files provided."));
+        if (string.IsNullOrWhiteSpace(name))
+            return Results.BadRequest(ApiResponse.Error("Document name is required."));
 
         try
         {
-            var uploadedUrls = new List<string>();
+            var uploadedDocs = new List<ApplicationDocument>();
             foreach (var file in files)
             {
                 var url = await blob.UploadAsync(file, $"admissions-docs/{id}");
-                application.DocumentUrls.Add(url);
-                uploadedUrls.Add(url);
+
+                var doc = new ApplicationDocument
+                {
+                    ApplicationId = id,
+                    Name = name.Trim(),
+                    FileUrl = url,
+                    FileName = file.FileName,
+                    ContentType = file.ContentType,
+                    FileSize = file.Length,
+                };
+                db.ApplicationDocuments.Add(doc);
+                uploadedDocs.Add(doc);
             }
 
             await db.SaveChangesAsync();
-            return Results.Ok(ApiResponse.Ok(new { uploadedUrls, total = application.DocumentUrls.Count }, "Documents uploaded successfully."));
+
+            var docs = await db.ApplicationDocuments
+                .Where(d => d.ApplicationId == id)
+                .OrderBy(d => d.UploadedAt)
+                .ToListAsync();
+
+            return Results.Ok(ApiResponse.Ok(
+                docs.Select(DocumentMapper.ToResponse),
+                $"{uploadedDocs.Count} document(s) uploaded successfully."));
         }
         catch (InvalidOperationException ex)
         {
             return Results.BadRequest(ApiResponse.Error(ex.Message));
         }
+    }
+
+    static async Task<IResult> ReplaceDocument(
+        Guid id, Guid documentId, IFormFile file,
+        ORUDbContext db, BlobStorageService blob)
+    {
+        var document = await db.ApplicationDocuments.FindAsync(documentId);
+        if (document is null || document.ApplicationId != id)
+            return Results.NotFound(ApiResponse.Error("Document not found."));
+
+        try
+        {
+            await blob.DeleteAsync(document.FileUrl);
+            var url = await blob.UploadAsync(file, $"admissions-docs/{id}");
+
+            document.FileUrl = url;
+            document.FileName = file.FileName;
+            document.ContentType = file.ContentType;
+            document.FileSize = file.Length;
+            document.UploadedAt = DateTime.UtcNow;
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(ApiResponse.Ok(
+                DocumentMapper.ToResponse(document),
+                "Document replaced successfully."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(ApiResponse.Error(ex.Message));
+        }
+    }
+
+    static async Task<IResult> DeleteDocument(
+        Guid id, Guid documentId,
+        ORUDbContext db, BlobStorageService blob)
+    {
+        var document = await db.ApplicationDocuments.FindAsync(documentId);
+        if (document is null || document.ApplicationId != id)
+            return Results.NotFound(ApiResponse.Error("Document not found."));
+
+        try
+        {
+            await blob.DeleteAsync(document.FileUrl);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(ApiResponse.Error(ex.Message));
+        }
+
+        db.ApplicationDocuments.Remove(document);
+        await db.SaveChangesAsync();
+
+        var docs = await db.ApplicationDocuments
+            .Where(d => d.ApplicationId == id)
+            .OrderBy(d => d.UploadedAt)
+            .ToListAsync();
+
+        return Results.Ok(ApiResponse.Ok(
+            docs.Select(DocumentMapper.ToResponse),
+            "Document deleted successfully."));
     }
 
     private static async Task<string> GenerateMatricNumber(

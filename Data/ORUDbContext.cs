@@ -12,11 +12,9 @@ namespace ORUApi.Data
      public DbSet<Admin> Admins => Set<Admin>();
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<StudyLevel> StudyLevels => Set<StudyLevel>();
+    public DbSet<ApplicationDocument> ApplicationDocuments => Set<ApplicationDocument>();
         protected override void OnModelCreating(ModelBuilder model)
     {
-        model.Entity<Application>()
-            .Property(a => a.DocumentUrls).HasColumnType("jsonb");
-
         model.Entity<Application>()
             .Property(a => a.StudyLevelId).HasColumnName("StudyLevel");
 
@@ -25,6 +23,12 @@ namespace ORUApi.Data
             .WithMany()
             .HasForeignKey(a => a.StudyLevelId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        model.Entity<Application>()
+            .HasMany(a => a.Documents)
+            .WithOne(d => d.Application)
+            .HasForeignKey(d => d.ApplicationId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         model.Entity<Student>()
             .Property(s => s.EnrolledCourses).HasColumnType("jsonb");

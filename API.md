@@ -400,7 +400,7 @@ Content-Type: application/json
 | `email` | string | **Yes** | |
 | `phone` | string | No | |
 | `dateOfBirth` | string | No | Format: `YYYY-MM-DD` |
-| `address` | string | No | |
+| `address` | string | **Yes** | |
 | `selectedProgram` | string | **Yes** | Any program name |
 | `studyLevelId` | int | **Yes** | From `GET /api/applications/study-levels` |
 
@@ -418,7 +418,7 @@ Content-Type: application/json
     "studyLevelName": "Undergraduate",
     "status": 0,
     "applicationFeePaid": false,
-    "documentUrls": [],
+    "documents": [],
     "submittedAt": "2026-06-13T09:15:00Z"
   }
 }
@@ -446,16 +446,77 @@ GET /api/applications/status/{email}
 ### 5.3 Upload Documents
 
 ```
-POST /api/applications/{id}/documents
+POST /api/applications/{id}/documents?name=Transcript
 Content-Type: multipart/form-data
 ```
 *Public — no auth*
 
 | Field | Type | Required |
 |---|---|---|
+| `name` | string (query) | **Yes** — e.g. `Transcript`, `Passport`, `Recommendation Letter` |
 | `files` | file[] | Yes |
 
-### 5.4 Admin: List Applications
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "2 document(s) uploaded successfully.",
+  "data": [
+    {
+      "id": "d7e8f9a0-...",
+      "name": "Transcript",
+      "fileUrl": "https://...",
+      "fileName": "transcript.pdf",
+      "contentType": "application/pdf",
+      "fileSize": 245760,
+      "uploadedAt": "2026-06-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+### 5.4 Replace Document
+
+```
+PUT /api/applications/{id}/documents/{documentId}
+Content-Type: multipart/form-data
+```
+*Public — no auth*
+
+Replaces a previously uploaded document (e.g. wrong file was submitted).
+
+| Field | Type | Required |
+|---|---|---|
+| `file` | file | Yes — the corrected file |
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Document replaced successfully.",
+  "data": {
+    "id": "d7e8f9a0-...",
+    "name": "Transcript",
+    "fileUrl": "https://...",
+    "fileName": "transcript-corrected.pdf",
+    "contentType": "application/pdf",
+    "fileSize": 251904,
+    "uploadedAt": "2026-06-15T11:30:00Z"
+  }
+}
+```
+
+### 5.5 Delete Document
+
+```
+DELETE /api/applications/{id}/documents/{documentId}
+```
+*Public — no auth*
+
+Removes a document and its file from blob storage.
+
+
+### 5.6 Admin: List Applications
 
 ```
 GET /api/admin/applications?status=0&page=1&pageSize=20
@@ -482,7 +543,7 @@ GET /api/admin/applications?status=0&page=1&pageSize=20
         "studyLevelName": "Undergraduate",
         "status": 0,
         "applicationFeePaid": false,
-        "documentUrls": [],
+        "documents": [],
         "submittedAt": "2026-06-13T09:15:00Z"
       }
     ]
@@ -490,14 +551,14 @@ GET /api/admin/applications?status=0&page=1&pageSize=20
 }
 ```
 
-### 5.5 Admin: Get Single Application
+### 5.7 Admin: Get Single Application
 
 ```
 GET /api/admin/applications/{id}
 ```
 *Requires: AdmissionsOfficer or SuperAdmin*
 
-### 5.6 Admin: Update Application Status
+### 5.8 Admin: Update Application Status
 
 ```
 PATCH /api/admin/applications/{id}/status
@@ -513,7 +574,7 @@ Content-Type: application/json
 ```
 `status` values: `0`=Pending, `1`=UnderReview, `2`=Approved, `3`=Rejected
 
-### 5.7 Admin: Admit Student
+### 5.9 Admin: Admit Student
 
 ```
 POST /api/admin/applications/{id}/admit

@@ -45,8 +45,9 @@ if (!string.IsNullOrEmpty(kvName))
 var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(
     builder.Configuration.GetConnectionString("DefaultConnection")!);
 dataSourceBuilder.EnableDynamicJson();
+var dataSource = dataSourceBuilder.Build();
 builder.Services.AddDbContext<ORUDbContext>(opt =>
-    opt.UseNpgsql(dataSourceBuilder.Build()));
+    opt.UseNpgsql(dataSource));
 
 // JWT Auth (two schemes: student + admin)
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
