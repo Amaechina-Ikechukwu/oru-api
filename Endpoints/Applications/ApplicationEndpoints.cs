@@ -55,6 +55,9 @@ public static class ApplicationEndpoints
         if (string.IsNullOrWhiteSpace(req.SelectedProgram))
             return Results.BadRequest(ApiResponse.Error("Please select a program."));
 
+        if (string.IsNullOrWhiteSpace(req.Address))
+            return Results.BadRequest(ApiResponse.Error("Address is required."));
+
         if (req.StudyLevelId <= 0)
             return Results.BadRequest(ApiResponse.Error("Please select a study level."));
 
