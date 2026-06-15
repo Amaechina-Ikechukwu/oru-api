@@ -9,7 +9,10 @@ public class BlobStorageService(IConfiguration config, ILogger<BlobStorageServic
 
     private BlobContainerClient GetContainer()
     {
-        var cs = config["ORUKey"] ?? config["AzureStorage:ConnectionString"]!;
+        var cs = config["ORUKey"] ?? config["AzureStorage:ConnectionString"];
+        if (string.IsNullOrWhiteSpace(cs) || cs == "UseDevelopmentStorage=true")
+            throw new InvalidOperationException(
+                "Azure Storage connection string is not configured. Set AzureStorage:ConnectionString in App Service settings or add ORUKey to Key Vault.");
         return new BlobServiceClient(cs).GetBlobContainerClient(ContainerName);
     }
 

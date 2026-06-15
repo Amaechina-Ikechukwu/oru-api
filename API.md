@@ -431,17 +431,71 @@ GET /api/applications/status/{email}
 ```
 *Public — no auth*
 
+Returns the full application snapshot including `id` for document uploads and the list of already-uploaded documents.
+
 **Response `200`:**
 ```json
 {
   "success": true,
   "data": {
+    "id": "b53b3b5b-38c6-4f3a-b9a0-123456789abc",
+    "fullName": "Jane Smith",
+    "selectedProgram": "Computer Science",
     "status": 1,
     "applicationFeePaid": false,
-    "submittedAt": "2026-06-13T09:15:00Z"
+    "submittedAt": "2026-06-13T09:15:00Z",
+    "documents": [
+      {
+        "id": "d7e8f9a0-1111-2222-3333-444455556666",
+        "name": "Transcript",
+        "fileUrl": "https://...",
+        "fileName": "transcript.pdf",
+        "contentType": "application/pdf",
+        "fileSize": 245760,
+        "uploadedAt": "2026-06-15T10:00:00Z"
+      },
+      {
+        "id": "e8f9a0b1-2222-3333-4444-555566667777",
+        "name": "Passport",
+        "fileUrl": "https://...",
+        "fileName": "passport.jpg",
+        "contentType": "image/jpeg",
+        "fileSize": 98304,
+        "uploadedAt": "2026-06-15T10:05:00Z"
+      }
+    ]
   }
 }
 ```
+
+### 5.2a Frontend Flow
+
+After submitting an application, the frontend should:
+
+1. **Save the `id`** from `POST /api/applications` response — use it for all document endpoints.
+
+2. **If the user returns later (only has their email)**, call `GET /api/applications/status/{email}` to retrieve the `id` and see which documents already exist.
+
+3. **Document upload pattern:**
+   ```
+   // Upload new documents
+   POST /api/applications/{id}/documents?name=Transcript
+   Content-Type: multipart/form-data
+   Body: the file
+   
+   // Replace a wrong upload
+   PUT /api/applications/{id}/documents/{documentId}
+   Content-Type: multipart/form-data
+   Body: the corrected file
+   
+   // Remove a document
+   DELETE /api/applications/{id}/documents/{documentId}
+   ```
+
+4. **Track uploaded vs required:** Maintain a list of expected document names (e.g. `["Transcript", "Passport", "Recommendation Letter"]`). The `documents` array in the status response tells you which have been uploaded. Show a checklist:
+   - Transcript ✓ (tap to view/replace/delete)
+   - Passport ✓ (tap to view/replace/delete)
+   - Recommendation Letter ✗ (tap to upload)
 
 ### 5.3 Upload Documents
 

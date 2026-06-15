@@ -115,6 +115,7 @@ public static class ApplicationEndpoints
     static async Task<IResult> GetStatusByEmail(string email, ORUDbContext db)
     {
         var application = await db.Applications
+            .Include(a => a.Documents)
             .Where(a => a.Email == email)
             .OrderByDescending(a => a.SubmittedAt)
             .FirstOrDefaultAsync();
@@ -124,9 +125,15 @@ public static class ApplicationEndpoints
 
         return Results.Ok(ApiResponse.Ok(new
         {
+            application.Id,
+            application.FullName,
+            application.SelectedProgram,
             application.Status,
             application.ApplicationFeePaid,
-            application.SubmittedAt
+            application.SubmittedAt,
+            Documents = application.Documents
+                .OrderBy(d => d.UploadedAt)
+                .Select(DocumentMapper.ToResponse)
         }));
     }
 
