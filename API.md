@@ -476,34 +476,55 @@ After submitting an application, the frontend should:
 
 2. **If the user returns later (only has their email)**, call `GET /api/applications/status/{email}` to retrieve the `id` and see which documents already exist.
 
-3. **Document upload pattern:**
+3. **Upload UI — user enters document name and picks a file:**
+   - Show a text input (or dropdown) where the user types the document name (e.g. "Transcript", "Passport", "Recommendation Letter")
+   - Show a file picker
+   - Both are required — the user provides the name and the file
+   - On submit, call:
+     ```
+     POST /api/applications/{id}/documents?name={userInputName}
+     Content-Type: multipart/form-data
+     Body: the file
+     ```
+   - Example with user entering "Transcript":
+     ```
+     POST /api/applications/b53b3b5b-.../documents?name=Transcript
+     ```
+
+   **Replace a wrong upload** (user picks new file for an existing document):
    ```
-   // Upload new documents
-   POST /api/applications/{id}/documents?name=Transcript
-   Content-Type: multipart/form-data
-   Body: the file
-   
-   // Replace a wrong upload
    PUT /api/applications/{id}/documents/{documentId}
    Content-Type: multipart/form-data
    Body: the corrected file
-   
-   // Remove a document
+   ```
+
+   **Delete a document:**
+   ```
    DELETE /api/applications/{id}/documents/{documentId}
    ```
 
-4. **Track uploaded vs required:** Maintain a list of expected document names (e.g. `["Transcript", "Passport", "Recommendation Letter"]`). The `documents` array in the status response tells you which have been uploaded. Show a checklist:
-   - Transcript ✓ (tap to view/replace/delete)
-   - Passport ✓ (tap to view/replace/delete)
-   - Recommendation Letter ✗ (tap to upload)
+4. **Track uploaded using the status response:** Call `GET /api/applications/status/{email}` to get the `documents` array. Each document has `name` (the name the user typed), `fileName` (the original file name), `fileSize`, `uploadedAt`. Render a list so the user can see what they've uploaded and replace/delete individual items:
+   ```
+   Uploaded documents:
+   ┌─────────────────────────────────────────────────────┐
+   │ Transcript     transcript.pdf     240 KB  10:00 AM │
+   │ [View] [Replace] [Delete]                           │
+   ├─────────────────────────────────────────────────────┤
+   │ Passport       passport.jpg        96 KB  10:05 AM │
+   │ [View] [Replace] [Delete]                           │
+   └─────────────────────────────────────────────────────┘
+   + Add another document  [Name: ___] [Choose File] [Upload]
+   ```
 
 ### 5.3 Upload Documents
 
 ```
-POST /api/applications/{id}/documents?name=Transcript
+POST /api/applications/{id}/documents?name={userEnteredName}
 Content-Type: multipart/form-data
 ```
 *Public — no auth*
+
+The `name` query parameter is **the name the user types** (e.g. "Transcript", "Passport", "Recommendation Letter"). It is required and used to identify the document type later.
 
 | Field | Type | Required |
 |---|---|---|

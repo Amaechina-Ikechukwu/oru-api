@@ -1,11 +1,13 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 
 namespace ORUApi.Services;
 
 public class BlobStorageService(IConfiguration config, ILogger<BlobStorageService> logger)
 {
     private const string ContainerName = "university-files";
+    private static readonly TimeSpan SasExpiry = TimeSpan.FromDays(3650);
 
     private BlobContainerClient GetContainer()
     {
@@ -21,7 +23,7 @@ public class BlobStorageService(IConfiguration config, ILogger<BlobStorageServic
         try
         {
             var container = GetContainer();
-            await container.CreateIfNotExistsAsync(PublicAccessType.Blob);
+            await container.CreateIfNotExistsAsync(PublicAccessType.None);
 
             var blobName = $"{folder}/{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
             var blob = container.GetBlobClient(blobName);
@@ -31,7 +33,15 @@ public class BlobStorageService(IConfiguration config, ILogger<BlobStorageServic
                 HttpHeaders = new BlobHttpHeaders { ContentType = file.ContentType }
             });
 
-            return blob.Uri.ToString();
+            var sas = new BlobSasBuilder
+            {
+                BlobContainerName = ContainerName,
+                BlobName = blobName,
+                Resource = "b",
+                ExpiresOn = DateTimeOffset.UtcNow.Add(SasExpiry)
+            };
+            sas.SetPermissions(BlobSasPermissions.Read);
+            return blob.GenerateSasUri(sas).ToString();
         }
         catch (Exception ex)
         {
