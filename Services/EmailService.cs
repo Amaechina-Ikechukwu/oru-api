@@ -16,15 +16,19 @@ public class EmailService
 
     public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
     {
-        var token = _config["ZeptoMail:Token"];
+        var rawToken = _config["ZeptoMail:Token"];
         var fromAddress = _config["ZeptoMail:FromEmail"] ?? "noreply@oru.edu.ng";
         var fromName = _config["ZeptoMail:FromName"] ?? "ORU PH Admissions";
 
-        if (string.IsNullOrEmpty(token))
+        if (string.IsNullOrEmpty(rawToken))
         {
             _logger.LogWarning("ZeptoMail token not configured. Skipping email to {Email}", toEmail);
             return;
         }
+
+        var authHeader = rawToken.StartsWith("Zoho-enczapikey", StringComparison.OrdinalIgnoreCase)
+            ? rawToken
+            : $"Zoho-enczapikey {rawToken}";
 
         var payload = new
         {
@@ -40,7 +44,8 @@ public class EmailService
             {
                 Content = JsonContent.Create(payload)
             };
-            request.Headers.Add("Authorization", token);
+            request.Headers.Add("Authorization", authHeader);
+            request.Headers.Add("Accept", "application/json");
 
             var response = await _http.SendAsync(request);
             if (!response.IsSuccessStatusCode)
