@@ -250,6 +250,9 @@ public static class ApplicationEndpoints
             var uploadedDocs = new List<ApplicationDocument>();
             foreach (var file in files)
             {
+                if (file.ContentType != "application/pdf")
+                    return Results.BadRequest(ApiResponse.Error($"Only PDF files are allowed. '{file.FileName}' is not a PDF."));
+
                 var url = await blob.UploadAsync(file, $"admissions-docs/{id}");
 
                 var doc = new ApplicationDocument
@@ -289,6 +292,9 @@ public static class ApplicationEndpoints
         var document = await db.ApplicationDocuments.FindAsync(documentId);
         if (document is null || document.ApplicationId != id)
             return Results.NotFound(ApiResponse.Error("Document not found."));
+
+        if (file.ContentType != "application/pdf")
+            return Results.BadRequest(ApiResponse.Error("Only PDF files are allowed."));
 
         try
         {
