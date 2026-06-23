@@ -134,6 +134,7 @@ public static class ApplicationEndpoints
             application.SelectedProgram,
             application.Status,
             application.ApplicationFeePaid,
+            application.ApplicationFeeReceiptUrl,
             application.SubmittedAt,
             Documents = application.Documents
                 .OrderBy(d => d.UploadedAt)
