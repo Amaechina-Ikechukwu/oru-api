@@ -149,9 +149,6 @@ public static class ApplicationEndpoints
     {
         var query = db.Applications.AsQueryable();
 
-        // Only show applications where fee is paid or receipt is uploaded
-        query = query.Where(a => a.ApplicationFeePaid || a.ApplicationFeeReceiptUrl != null);
-
         if (Enum.TryParse<ApplicationStatus>(status, out var parsed))
             query = query.Where(a => a.Status == parsed);
         else
