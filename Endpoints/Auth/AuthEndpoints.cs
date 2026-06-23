@@ -169,7 +169,8 @@ public static class AuthEndpoints
 
     static async Task<IResult> SetupAdmin(SetupAdminRequest req, ORUDbContext db, AdminActivityLogger logger)
     {
-        var admin = await db.Admins.FirstOrDefaultAsync(a => a.VerificationToken == req.Token);
+        var cleanToken = req.Token.Replace(" ", "+");
+        var admin = await db.Admins.FirstOrDefaultAsync(a => a.VerificationToken == cleanToken || a.VerificationToken == req.Token);
         if (admin is null)
             return Results.BadRequest(ApiResponse.Error("Invalid or expired verification token."));
 
