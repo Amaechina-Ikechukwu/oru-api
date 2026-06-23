@@ -172,6 +172,23 @@ public class EmailService
             body);
     }
 
+    public static string ApplicationUnderReview(string name, string program)
+    {
+        var body = $"""
+            <p style="font-family:Georgia,serif;font-size:18px;color:#16233c;margin:0 0 20px 0;">Dear {name},</p>
+            <p style="margin:0 0 12px 0;">Your application for <strong style="color:#16233c;">{program}</strong> is now actively under review.</p>
+            <p style="margin:0;">We will notify you once a decision has been made.</p>
+            """
+            + Callout("APPLICATION STATUS", "Under Review")
+            + """
+            <p style="margin:28px 0 0 0;color:#94a3b8;font-size:13px;">— ORU Admissions</p>
+            """;
+        return Layout(
+            "Your application is now under review.",
+            "Application Under Review",
+            body);
+    }
+
     public static string ApplicationRejected(string name, string program)
     {
         var body = $"""

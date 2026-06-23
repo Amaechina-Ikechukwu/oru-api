@@ -199,6 +199,10 @@ public static class ApplicationEndpoints
             email.SendFireAndForget(application.Email, application.FullName,
                 "Application Update — ORU",
                 EmailService.ApplicationRejected(application.FullName, application.SelectedProgram));
+        else if (req.Status == ApplicationStatus.UnderReview)
+            email.SendFireAndForget(application.Email, application.FullName,
+                "Application Under Review — ORU",
+                EmailService.ApplicationUnderReview(application.FullName, application.SelectedProgram));
 
         return Results.Ok(ApiResponse.Ok(ApplicationMapper.ToResponse(application), "Application status updated successfully."));
     }
