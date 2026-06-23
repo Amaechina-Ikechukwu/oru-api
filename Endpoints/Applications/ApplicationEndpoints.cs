@@ -31,6 +31,10 @@ public static class ApplicationEndpoints
         group.MapDelete("/{id}/documents/{documentId:guid}", DeleteDocument)
             .WithSummary("Delete a document");
 
+        group.MapPost("/{id}/submit-receipt", SubmitFeeReceipt)
+            .WithSummary("Submit application fee receipt")
+            .DisableAntiforgery();
+
         var admin = app.MapGroup("/api/admin/applications").WithTags("Admin: Applications");
 
         admin.MapGet("/", GetAllApplications)
@@ -145,6 +149,9 @@ public static class ApplicationEndpoints
     {
         var query = db.Applications.AsQueryable();
 
+        // Only show applications where fee is paid or receipt is uploaded
+        query = query.Where(a => a.ApplicationFeePaid || a.ApplicationFeeReceiptUrl != null);
+
         if (Enum.TryParse<ApplicationStatus>(status, out var parsed))
             query = query.Where(a => a.Status == parsed);
         else
@@ -210,6 +217,7 @@ public static class ApplicationEndpoints
             return Results.Conflict(ApiResponse.Error("A student account already exists for this email."));
 
         var matric = await GenerateMatricNumber(application.SelectedProgram, db);
+        var level = await db.StudyLevels.FindAsync(application.StudyLevelId);
 
         var student = new Student
         {
@@ -218,6 +226,7 @@ public static class ApplicationEndpoints
             Email = application.Email,
             Program = application.SelectedProgram,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(matric),
+            TotalTuitionDue = level?.TuitionFee ?? 0,
         };
 
         db.Students.Add(student);
@@ -347,6 +356,29 @@ public static class ApplicationEndpoints
         return Results.Ok(ApiResponse.Ok(
             docs.Select(DocumentMapper.ToResponse),
             "Document deleted successfully."));
+    }
+
+    static async Task<IResult> SubmitFeeReceipt(
+        Guid id, IFormFile file, ORUDbContext db, BlobStorageService blob)
+    {
+        var application = await db.Applications.FindAsync(id);
+        if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
+
+        if (file.ContentType != "application/pdf" && !file.ContentType.StartsWith("image/"))
+            return Results.BadRequest(ApiResponse.Error("Only PDF or image files are allowed."));
+
+        try
+        {
+            var url = await blob.UploadAsync(file, $"fee-receipts/{id}");
+            application.ApplicationFeeReceiptUrl = url;
+            await db.SaveChangesAsync();
+
+            return Results.Ok(ApiResponse.Ok(new { application.ApplicationFeeReceiptUrl }, "Receipt submitted successfully."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(ApiResponse.Error(ex.Message));
+        }
     }
 
     private static async Task<string> GenerateMatricNumber(

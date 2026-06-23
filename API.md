@@ -289,7 +289,7 @@ Content-Type: multipart/form-data
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `installmentNumber` | int | Yes | `1`, `2`, or `3` |
+| `installmentNumber` | int | Yes | `1`, `2`, `3`, or `4`. (For full payment, use `1`) |
 | `amount` | decimal | Yes | Must be > 0 |
 | `notes` | string | No | Optional note |
 | `files` | file[] | Yes | 1 to 3 screenshot images |
@@ -315,7 +315,7 @@ Content-Type: multipart/form-data
 
 **Validation errors `400`:**
 - `"Amount must be greater than zero."`
-- `"Installment number must be 1, 2, or 3."`
+- `"Installment number must be between 1 and 4."`
 - `"At least one screenshot is required."`
 - `"Maximum 3 screenshots per installment."`
 - `"File upload is currently unavailable. Azure Storage is not configured or reachable."`
@@ -443,6 +443,7 @@ Returns the full application snapshot including `id` for document uploads and th
     "selectedProgram": "Computer Science",
     "status": 1,
     "applicationFeePaid": false,
+    "applicationFeeReceiptUrl": null,
     "submittedAt": "2026-06-13T09:15:00Z",
     "documents": [
       {
@@ -516,7 +517,32 @@ After submitting an application, the frontend should:
    + Add another document  [Name: ___] [Choose File] [Upload]
    ```
 
-### 5.3 Upload Documents
+### 5.3 Submit Application Fee Receipt
+
+```
+POST /api/applications/{id}/submit-receipt
+Content-Type: multipart/form-data
+```
+*Public — no auth*
+
+Allows the applicant to manually upload an application fee receipt (PDF or Image). The application will become visible to admins once this is submitted.
+
+| Field | Type | Required |
+|---|---|---|
+| `file` | file | Yes |
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Receipt submitted successfully.",
+  "data": {
+    "applicationFeeReceiptUrl": "https://..."
+  }
+}
+```
+
+### 5.4 Upload Documents
 
 ```
 POST /api/applications/{id}/documents?name={userEnteredName}

@@ -14,16 +14,20 @@ public class EmailService
         _logger = logger;
     }
 
-    public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
+    public async Task<EmailSendResult> SendAsync(string toEmail, string toName, string subject, string htmlBody)
     {
         var rawToken = _config["ZeptoMail:Token"];
         var fromAddress = _config["ZeptoMail:FromEmail"] ?? "noreply@oru.edu.ng";
         var fromName = _config["ZeptoMail:FromName"] ?? "ORU PH Admissions";
+        var configuredApiUrl = _config["ZeptoMail:ApiUrl"];
+        var apiUrl = string.IsNullOrWhiteSpace(configuredApiUrl) 
+            ? "https://api.zeptomail.com/v1.1/email" 
+            : configuredApiUrl.Trim();
 
         if (string.IsNullOrEmpty(rawToken))
         {
             _logger.LogWarning("ZeptoMail token not configured. Skipping email to {Email}", toEmail);
-            return;
+            return new EmailSendResult(false, "ZeptoMail token not configured.");
         }
 
         var authHeader = rawToken.StartsWith("Zoho-enczapikey", StringComparison.OrdinalIgnoreCase)
@@ -40,7 +44,7 @@ public class EmailService
 
         try
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.zeptomail.com/v1.1/email")
+            var request = new HttpRequestMessage(HttpMethod.Post, apiUrl)
             {
                 Content = JsonContent.Create(payload)
             };
@@ -52,15 +56,18 @@ public class EmailService
             {
                 var body = await response.Content.ReadAsStringAsync();
                 _logger.LogError("ZeptoMail failed ({Status}) for {Email}: {Body}", (int)response.StatusCode, toEmail, body);
+                return new EmailSendResult(false, "ZeptoMail API returned an error status code.", (int)response.StatusCode, body);
             }
             else
             {
                 _logger.LogInformation("Email sent to {Email}: {Subject}", toEmail, subject);
+                return new EmailSendResult(true, "Email sent successfully.");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ZeptoMail send failed for {Email}", toEmail);
+            return new EmailSendResult(false, $"Exception occurred: {ex.Message}");
         }
     }
 
@@ -68,6 +75,8 @@ public class EmailService
     {
         _ = Task.Run(() => SendAsync(toEmail, toName, subject, htmlBody));
     }
+
+    public record EmailSendResult(bool Success, string Message, int? StatusCode = null, string? ErrorBody = null);
 
     // ---- Layout helpers ----
 

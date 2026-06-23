@@ -181,11 +181,12 @@ using (var scope = app.Services.CreateScope())
     {
         var levels = new[]
         {
-            new ORUApi.Models.StudyLevel { Name = "Certificate", Description = "Professional Certifications & Short-Term Courses (3-6 months or 1 year)", Duration = "3-12 months", SortOrder = 1 },
-            new ORUApi.Models.StudyLevel { Name = "Diploma", Description = "Diploma Programs (2 years)", Duration = "2 years", SortOrder = 2 },
-            new ORUApi.Models.StudyLevel { Name = "Undergraduate", Description = "Undergraduate / Bachelor's Degree (4 years)", Duration = "4 years", SortOrder = 3 },
-            new ORUApi.Models.StudyLevel { Name = "Postgraduate Diploma", Description = "Postgraduate Diploma (PGDE, PDE)", Duration = "1-2 years", SortOrder = 4 },
-            new ORUApi.Models.StudyLevel { Name = "Masters", Description = "Master's Degree (M.Ed., etc.)", Duration = "1-2 years", SortOrder = 5 },
+            new ORUApi.Models.StudyLevel { Name = "Certificate", Description = "Professional Certifications & Short-Term Courses (3-6 months or 1 year)", Duration = "3-12 months", SortOrder = 1, ApplicationFee = 8000, TuitionFee = 0 },
+            new ORUApi.Models.StudyLevel { Name = "Diploma", Description = "Diploma Programs (2 years)", Duration = "2 years", SortOrder = 2, ApplicationFee = 10000, TuitionFee = 60000 },
+            new ORUApi.Models.StudyLevel { Name = "Undergraduate", Description = "Undergraduate / Bachelor's Degree (4 years)", Duration = "4 years", SortOrder = 3, ApplicationFee = 40000, TuitionFee = 280000 },
+            new ORUApi.Models.StudyLevel { Name = "Postgraduate Diploma", Description = "Postgraduate Diploma (PGDE, PDE)", Duration = "1-2 years", SortOrder = 4, ApplicationFee = 20000, TuitionFee = 0 },
+            new ORUApi.Models.StudyLevel { Name = "Masters", Description = "Master's Degree (M.Ed., etc.)", Duration = "1-2 years", SortOrder = 5, ApplicationFee = 70000, TuitionFee = 400000 },
+            new ORUApi.Models.StudyLevel { Name = "PHD", Description = "Doctor of Philosophy (Ph.D.)", Duration = "2 years", SortOrder = 6, ApplicationFee = 70000, TuitionFee = 650000 },
         };
         db.StudyLevels.AddRange(levels);
         db.SaveChanges();

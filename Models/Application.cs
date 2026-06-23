@@ -24,6 +24,7 @@ namespace ORUApi.Models
         public ApplicationStatus Status { get; set; } = ApplicationStatus.Pending;
         public bool ApplicationFeePaid { get; set; } = false;
         public string? PaymentReference { get; set; }
+        public string? ApplicationFeeReceiptUrl { get; set; }
 
         public List<ApplicationDocument> Documents { get; set; } = [];
 

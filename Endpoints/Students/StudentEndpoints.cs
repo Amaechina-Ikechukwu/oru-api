@@ -224,8 +224,8 @@ public static class StudentEndpoints
         if (amount <= 0)
             return Results.BadRequest(ApiResponse.Error("Amount must be greater than zero."));
 
-        if (installmentNumber < 1 || installmentNumber > 3)
-            return Results.BadRequest(ApiResponse.Error("Installment number must be 1, 2, or 3."));
+        if (installmentNumber < 1 || installmentNumber > 4)
+            return Results.BadRequest(ApiResponse.Error("Installment number must be between 1 and 4."));
 
         var submission = new InstallmentSubmission
         {

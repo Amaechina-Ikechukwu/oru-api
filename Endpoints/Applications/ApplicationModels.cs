@@ -33,6 +33,7 @@ public record ApplicationResponse(
     string? StudyLevelName,
     ApplicationStatus Status,
     bool ApplicationFeePaid,
+    string? ApplicationFeeReceiptUrl,
     List<DocumentResponse> Documents,
     DateTime SubmittedAt
 );
@@ -44,7 +45,7 @@ public static class ApplicationMapper
         a.SelectedProgram,
         a.StudyLevelId,
         a.StudyLevelRef?.Name,
-        a.Status, a.ApplicationFeePaid,
+        a.Status, a.ApplicationFeePaid, a.ApplicationFeeReceiptUrl,
         a.Documents.Select(DocumentMapper.ToResponse).ToList(),
         a.SubmittedAt
     );
