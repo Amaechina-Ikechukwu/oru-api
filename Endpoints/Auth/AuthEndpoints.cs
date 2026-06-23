@@ -30,9 +30,13 @@ public static class AuthEndpoints
 
         var admin = app.MapGroup("/api/admin/admins").WithTags("Admin: Admins");
 
-        admin.MapPost("/", CreateAdmin)
+        admin.MapPost("/invite", InviteAdmin)
             .RequireAuthorization("SuperAdmin")
-            .WithSummary("Create a new admin account");
+            .WithSummary("Invite a new admin account");
+
+        admin.MapPost("/setup", SetupAdmin)
+            .AllowAnonymous()
+            .WithSummary("Setup an invited admin account");
 
         admin.MapGet("/", GetAllAdmins)
             .RequireAuthorization("SuperAdmin")
@@ -99,7 +103,7 @@ public static class AuthEndpoints
         AdminLoginRequest req, ORUDbContext db, TokenService tokens)
     {
         var admin = await db.Admins
-            .FirstOrDefaultAsync(a => a.Email == req.Email && a.IsActive);
+            .FirstOrDefaultAsync(a => a.Email == req.Email && a.IsActive && a.Status == AdminStatus.Active);
 
         if (admin is null || !BCrypt.Net.BCrypt.Verify(req.Password, admin.PasswordHash))
             return Results.Unauthorized();
@@ -125,36 +129,63 @@ public static class AuthEndpoints
         return Results.Ok(ApiResponse.Ok<object?>(null, "Password updated successfully."));
     }
 
-    static async Task<IResult> CreateAdmin(CreateAdminRequest req, ORUDbContext db, EmailService email)
+    static async Task<IResult> InviteAdmin(InviteAdminRequest req, ORUDbContext db, EmailService email)
     {
         if (await db.Admins.AnyAsync(a => a.Email == req.Email))
             return Results.Conflict(ApiResponse.Error("An admin with this email already exists."));
 
-        if (await db.Admins.AnyAsync(a => a.StaffId == req.StaffId))
-            return Results.Conflict(ApiResponse.Error("An admin with this staff ID already exists."));
+        var token = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
         var admin = new Admin
         {
-            StaffId = req.StaffId,
-            FullName = req.FullName,
             Email = req.Email,
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password),
             Role = req.Role,
             Permissions = req.Permissions,
+            Status = AdminStatus.Pending,
+            VerificationToken = token,
+            TokenExpiresAt = DateTime.UtcNow.AddDays(2)
         };
 
         db.Admins.Add(admin);
         await db.SaveChangesAsync();
 
-        email.SendFireAndForget(req.Email, req.FullName,
-            "Admin Account Created — ORU",
-            EmailService.AdminCreated(req.FullName, req.StaffId, req.Email, req.Role.ToString(), req.Password));
+        var setupUrl = $"{req.FrontendSetupUrl}?token={Uri.EscapeDataString(token)}";
 
-        return Results.Created($"/api/admin/admins/{admin.Id}",
-            ApiResponse.Ok(new
-            {
-                admin.Id, admin.StaffId, admin.FullName, admin.Email, admin.Role
-            }, "Admin account created successfully."));
+        email.SendFireAndForget(req.Email, "Admin",
+            "Admin Invitation — ORU",
+            EmailService.AdminInvitation(req.Email, req.Role.ToString(), setupUrl));
+
+        return Results.Ok(ApiResponse.Ok<object?>(null, $"Invitation sent successfully to {req.Email}"));
+    }
+
+    static async Task<IResult> SetupAdmin(SetupAdminRequest req, ORUDbContext db)
+    {
+        var admin = await db.Admins.FirstOrDefaultAsync(a => a.VerificationToken == req.Token);
+        if (admin is null)
+            return Results.BadRequest(ApiResponse.Error("Invalid or expired verification token."));
+
+        if (admin.Status != AdminStatus.Pending)
+            return Results.BadRequest(ApiResponse.Error("This account has already been set up."));
+
+        if (admin.TokenExpiresAt < DateTime.UtcNow)
+            return Results.BadRequest(ApiResponse.Error("Verification token has expired. Please request a new invitation."));
+
+        if (await db.Admins.AnyAsync(a => a.StaffId == req.StaffId && a.Id != admin.Id))
+            return Results.Conflict(ApiResponse.Error("An admin with this staff ID already exists."));
+
+        admin.FullName = req.FullName;
+        admin.StaffId = req.StaffId;
+        admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password);
+        admin.Status = AdminStatus.Active;
+        admin.VerificationToken = null;
+        admin.TokenExpiresAt = null;
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(ApiResponse.Ok(new
+        {
+            admin.Id, admin.StaffId, admin.FullName, admin.Email, admin.Role
+        }, "Admin account verified and setup successfully. You may now log in."));
     }
 
     static async Task<IResult> GetAllAdmins(ORUDbContext db)

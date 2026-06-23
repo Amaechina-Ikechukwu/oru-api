@@ -16,6 +16,9 @@ public class Admin
     public AdminRole Role { get; set; }
     public AdminPermissions Permissions { get; set; } = new();
     public bool IsActive { get; set; } = true;
+    public AdminStatus Status { get; set; } = AdminStatus.Pending;
+    public string? VerificationToken { get; set; }
+    public DateTime? TokenExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -29,4 +32,5 @@ public class AdminPermissions
 }
 
 public enum AdminRole { SuperAdmin, AdmissionsOfficer, Bursar, AcademicAdvisor }
+public enum AdminStatus { Pending, Active, Suspended }
 }

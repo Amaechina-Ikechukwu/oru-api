@@ -6,9 +6,12 @@ public record AdminLoginRequest(string Email, string Password);
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 public record ActivateStudentRequest(string Email, string MatricNumber, string NewPassword);
 
-public record CreateAdminRequest(
-    string StaffId, string FullName, string Email,
-    string Password, AdminRole Role, AdminPermissions Permissions
+public record InviteAdminRequest(
+    string Email, AdminRole Role, AdminPermissions Permissions, string FrontendSetupUrl
+);
+
+public record SetupAdminRequest(
+    string Token, string FullName, string StaffId, string Password
 );
 
 public record AuthResponse(string Token, string Role, string Name, string Id);

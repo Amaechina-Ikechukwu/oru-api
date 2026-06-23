@@ -97,7 +97,7 @@ public class EmailService
             <tr><td align="center" style="padding:30px 20px;">
             <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
             <tr><td style="padding:28px 30px 22px 30px;text-align:center;border-bottom:3px solid #be123c;">
-            <span style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#16233c;letter-spacing:1px;">ORU</span>
+            <img src="https://firebasestorage.googleapis.com/v0/b/shield-3f2ba.firebasestorage.app/o/ORU%20logo.png?alt=media&token=748e853a-7b3d-4659-b0b8-28359015277c" alt="ORU Logo" style="height:50px;display:block;margin:0 auto;" />
             </td></tr>
             <tr><td style="padding:30px;font-family:Helvetica,Arial,sans-serif;color:#333333;font-size:15px;line-height:1.6;">
             {bodyInner}
@@ -291,6 +291,24 @@ public class EmailService
         return Layout(
             "Your admin account has been created on the ORU platform.",
             "Admin Account Created",
+            body);
+    }
+
+    public static string AdminInvitation(string email, string role, string setupUrl)
+    {
+        var body = $"""
+            <p style="font-family:Georgia,serif;font-size:18px;color:#16233c;margin:0 0 20px 0;">Hello,</p>
+            <p style="margin:0 0 12px 0;">You have been invited to join the ORU platform as an administrator.</p>
+            <p style="margin:0 0 12px 0;">Please click the button below to set up your account and password.</p>
+            """
+            + Callout("ROLE", role)
+            + Button("Set Up Account", setupUrl)
+            + """
+            <p style="margin:28px 0 0 0;color:#94a3b8;font-size:13px;">— ORU Administration</p>
+            """;
+        return Layout(
+            "You have been invited to join the ORU platform.",
+            "Admin Account Invitation",
             body);
     }
 

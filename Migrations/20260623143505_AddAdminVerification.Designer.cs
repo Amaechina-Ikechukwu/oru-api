@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ORUApi.Data;
@@ -13,9 +14,11 @@ using ORUApi.Models;
 namespace ORUApi.Migrations
 {
     [DbContext(typeof(ORUDbContext))]
-    partial class ORUDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260623143505_AddAdminVerification")]
+    partial class AddAdminVerification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
