@@ -11,7 +11,7 @@ public record InviteAdminRequest(
 );
 
 public record SetupAdminRequest(
-    string Token, string FullName, string StaffId, string Password
+    string Token, string FullName, string Password
 );
 
 public record AuthResponse(string Token, string Role, string Name, string Id);

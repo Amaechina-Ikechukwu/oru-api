@@ -13,8 +13,14 @@ namespace ORUApi.Data
     public DbSet<Course> Courses => Set<Course>();
     public DbSet<StudyLevel> StudyLevels => Set<StudyLevel>();
     public DbSet<ApplicationDocument> ApplicationDocuments => Set<ApplicationDocument>();
+    public DbSet<AdminActivityLog> AdminActivityLogs => Set<AdminActivityLog>();
         protected override void OnModelCreating(ModelBuilder model)
     {
+        model.Entity<AdminActivityLog>()
+            .HasOne(l => l.Admin)
+            .WithMany()
+            .HasForeignKey(l => l.AdminId)
+            .OnDelete(DeleteBehavior.Cascade);
         model.Entity<Application>()
             .Property(a => a.StudyLevelId).HasColumnName("StudyLevel");
 

@@ -73,6 +73,7 @@ builder.Services.AddAuthorization(opt => {
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<BlobStorageService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<AdminActivityLogger>();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -146,7 +147,8 @@ using (var scope = app.Services.CreateScope())
                 CanManageFinance = true,
                 CanManageAdmins = true
             },
-            IsActive = true
+            IsActive = true,
+            Status = ORUApi.Models.AdminStatus.Active
         };
         db.Admins.Add(admin);
         db.SaveChanges();

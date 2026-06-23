@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using ORUApi.Data;
 using ORUApi.Models;
 using ORUApi.Services;
@@ -180,7 +181,7 @@ public static class ApplicationEndpoints
     }
 
     static async Task<IResult> UpdateStatus(
-        Guid id, UpdateStatusRequest req, ORUDbContext db, EmailService email)
+        Guid id, UpdateStatusRequest req, ORUDbContext db, EmailService email, ClaimsPrincipal user, AdminActivityLogger logger)
     {
         var application = await db.Applications
             .Include(a => a.StudyLevelRef)
@@ -204,10 +205,13 @@ public static class ApplicationEndpoints
                 "Application Under Review — ORU",
                 EmailService.ApplicationUnderReview(application.FullName, application.SelectedProgram));
 
+        var currentAdminId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+        await logger.LogAsync(currentAdminId, $"Application {req.Status}", $"Changed application {application.Id} status to {req.Status}");
+
         return Results.Ok(ApiResponse.Ok(ApplicationMapper.ToResponse(application), "Application status updated successfully."));
     }
 
-    static async Task<IResult> AdmitStudent(Guid id, ORUDbContext db, EmailService email)
+    static async Task<IResult> AdmitStudent(Guid id, ORUDbContext db, EmailService email, ClaimsPrincipal user, AdminActivityLogger logger)
     {
         var application = await db.Applications.FindAsync(id);
         if (application is null) return Results.NotFound(ApiResponse.Error("Application not found."));
@@ -237,6 +241,9 @@ public static class ApplicationEndpoints
         email.SendFireAndForget(application.Email, application.FullName,
             "Welcome to ORU!",
             EmailService.StudentAdmitted(application.FullName, matric));
+
+        var currentAdminId = Guid.Parse(user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+        await logger.LogAsync(currentAdminId, "Admit Student", $"Admitted student with matric {matric}");
 
         return Results.Ok(ApiResponse.Ok(new
         {

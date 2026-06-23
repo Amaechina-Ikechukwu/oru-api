@@ -42,6 +42,10 @@ public static class AuthEndpoints
             .RequireAuthorization("SuperAdmin")
             .WithSummary("List all admin accounts");
 
+        admin.MapGet("/logs", GetActivityLogs)
+            .RequireAuthorization("SuperAdmin")
+            .WithSummary("View admin activity logs");
+
         admin.MapDelete("/{id}", DeactivateAdmin)
             .RequireAuthorization("SuperAdmin")
             .WithSummary("Deactivate an admin account");
@@ -100,13 +104,15 @@ public static class AuthEndpoints
     }
 
     static async Task<IResult> AdminLogin(
-        AdminLoginRequest req, ORUDbContext db, TokenService tokens)
+        AdminLoginRequest req, ORUDbContext db, TokenService tokens, AdminActivityLogger logger)
     {
         var admin = await db.Admins
             .FirstOrDefaultAsync(a => a.Email == req.Email && a.IsActive && a.Status == AdminStatus.Active);
 
         if (admin is null || !BCrypt.Net.BCrypt.Verify(req.Password, admin.PasswordHash))
             return Results.Unauthorized();
+
+        await logger.LogAsync(admin.Id, "Login", "Admin logged in successfully.");
 
         var token = tokens.CreateAdminToken(admin);
         return Results.Ok(ApiResponse.Ok(
@@ -129,7 +135,7 @@ public static class AuthEndpoints
         return Results.Ok(ApiResponse.Ok<object?>(null, "Password updated successfully."));
     }
 
-    static async Task<IResult> InviteAdmin(InviteAdminRequest req, ORUDbContext db, EmailService email)
+    static async Task<IResult> InviteAdmin(InviteAdminRequest req, ORUDbContext db, EmailService email, ClaimsPrincipal user, AdminActivityLogger logger)
     {
         if (await db.Admins.AnyAsync(a => a.Email == req.Email))
             return Results.Conflict(ApiResponse.Error("An admin with this email already exists."));
@@ -155,10 +161,13 @@ public static class AuthEndpoints
             "Admin Invitation — ORU",
             EmailService.AdminInvitation(req.Email, req.Role.ToString(), setupUrl));
 
+        var currentAdminId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        await logger.LogAsync(currentAdminId, "Admin Invited", $"Invited {req.Email} as {req.Role}");
+
         return Results.Ok(ApiResponse.Ok<object?>(null, $"Invitation sent successfully to {req.Email}"));
     }
 
-    static async Task<IResult> SetupAdmin(SetupAdminRequest req, ORUDbContext db)
+    static async Task<IResult> SetupAdmin(SetupAdminRequest req, ORUDbContext db, AdminActivityLogger logger)
     {
         var admin = await db.Admins.FirstOrDefaultAsync(a => a.VerificationToken == req.Token);
         if (admin is null)
@@ -170,17 +179,22 @@ public static class AuthEndpoints
         if (admin.TokenExpiresAt < DateTime.UtcNow)
             return Results.BadRequest(ApiResponse.Error("Verification token has expired. Please request a new invitation."));
 
-        if (await db.Admins.AnyAsync(a => a.StaffId == req.StaffId && a.Id != admin.Id))
-            return Results.Conflict(ApiResponse.Error("An admin with this staff ID already exists."));
+        var count = await db.Admins.CountAsync() + 1;
+        var baseId = $"ORU-STAFF-{count:D3}";
+        while (await db.Admins.AnyAsync(a => a.StaffId == baseId))
+        {
+            baseId = $"ORU-STAFF-{new Random().Next(1000, 9999)}";
+        }
 
         admin.FullName = req.FullName;
-        admin.StaffId = req.StaffId;
+        admin.StaffId = baseId;
         admin.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.Password);
         admin.Status = AdminStatus.Active;
         admin.VerificationToken = null;
         admin.TokenExpiresAt = null;
 
         await db.SaveChangesAsync();
+        await logger.LogAsync(admin.Id, "Account Setup", "Admin verified token and set up account.");
 
         return Results.Ok(ApiResponse.Ok(new
         {
@@ -198,12 +212,39 @@ public static class AuthEndpoints
         return Results.Ok(ApiResponse.Ok(admins));
     }
 
-    static async Task<IResult> DeactivateAdmin(Guid id, ORUDbContext db)
+    static async Task<IResult> DeactivateAdmin(Guid id, ORUDbContext db, ClaimsPrincipal user, AdminActivityLogger logger)
     {
         var admin = await db.Admins.FindAsync(id);
         if (admin is null) return Results.NotFound(ApiResponse.Error("Admin not found."));
         admin.IsActive = false;
         await db.SaveChangesAsync();
+
+        var currentAdminId = Guid.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        await logger.LogAsync(currentAdminId, "Deactivated Admin", $"Deactivated admin {admin.Email}");
+
         return Results.Ok(ApiResponse.Ok<object?>(null, $"{admin.FullName} has been deactivated."));
+    }
+
+    static async Task<IResult> GetActivityLogs(ORUDbContext db, Guid? adminId, string? action)
+    {
+        var query = db.AdminActivityLogs.Include(l => l.Admin).AsQueryable();
+        
+        if (adminId.HasValue)
+            query = query.Where(l => l.AdminId == adminId);
+        if (!string.IsNullOrWhiteSpace(action))
+            query = query.Where(l => l.Action == action);
+
+        var logs = await query.OrderByDescending(l => l.Timestamp)
+            .Take(100)
+            .Select(l => new {
+                l.Id,
+                l.AdminId,
+                AdminName = l.Admin != null ? l.Admin.FullName : "Unknown",
+                l.Action,
+                l.Details,
+                l.Timestamp
+            }).ToListAsync();
+
+        return Results.Ok(ApiResponse.Ok(logs));
     }
 }
